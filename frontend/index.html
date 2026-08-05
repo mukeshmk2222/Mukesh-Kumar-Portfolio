@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Candidate Dossier — Ask Anything</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink: #14161f;
+    --ink-2: #1b1e2a;
+    --panel: #1c2029;
+    --panel-line: #2c3140;
+    --paper: #f6f1e6;
+    --paper-line: #e2d9c4;
+    --gold: #c9a15d;
+    --gold-dim: #8a7248;
+    --moss: #7ea083;
+    --text-hi: #edeee6;
+    --text-lo: #8f95a8;
+    --hr-text: #26242090;
+    --err: #c97a6b;
+    --radius: 3px;
+  }
+
+  *{ box-sizing: border-box; }
+
+  html, body{
+    margin:0; padding:0; height:100%;
+    background: var(--ink);
+    color: var(--text-hi);
+    font-family: 'IBM Plex Sans', sans-serif;
+  }
+
+  ::selection{ background: var(--gold); color: var(--ink); }
+
+  .mono{ font-family: 'IBM Plex Mono', monospace; letter-spacing: 0.06em; }
+
+  a{ color: var(--gold); }
+
+  .shell{
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ---------- Top bar ---------- */
+  .topbar{
+    display:flex; align-items:center; justify-content:space-between;
+    padding: 18px 32px;
+    border-bottom: 1px solid var(--panel-line);
+  }
+  .topbar .eyebrow{
+    font-size: 11px;
+    text-transform: uppercase;
+    color: var(--text-lo);
+  }
+  .topbar .eyebrow b{ color: var(--gold); font-weight: 500; }
+
+  /* ---------- Layout ---------- */
+  .layout{
+    flex: 1;
+    display: grid;
+    grid-template-columns: 340px 1fr;
+    min-height: 0;
+  }
+  @media (max-width: 860px){
+    .layout{ grid-template-columns: 1fr; }
+  }
+
+  /* ---------- Dossier panel ---------- */
+  .dossier{
+    border-right: 1px solid var(--panel-line);
+    padding: 36px 28px;
+    display: flex;
+    flex-direction: column;
+    gap: 28px;
+  }
+  @media (max-width: 860px){
+    .dossier{ border-right: none; border-bottom: 1px solid var(--panel-line); }
+  }
+
+  .seal{
+    position: relative;
+    width: 84px; height: 84px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .seal::before{
+    content:"";
+    position:absolute; inset:0;
+    border-radius:50%;
+    border: 1px dashed var(--gold-dim);
+    animation: spin 40s linear infinite;
+  }
+  @media (prefers-reduced-motion: reduce){ .seal::before{ animation: none; } }
+  .seal::after{
+    content:"";
+    position:absolute; inset:10px;
+    border-radius:50%;
+    border: 1px solid var(--gold);
+  }
+  .seal-dot{
+    width:8px; height:8px; border-radius:50%;
+    background: var(--moss);
+    box-shadow: 0 0 0 4px rgba(126,160,131,0.15);
+  }
+  @keyframes spin{ to{ transform: rotate(360deg); } }
+
+  .status-line{
+    display:flex; align-items:center; gap:8px;
+    font-size: 11px; text-transform: uppercase; color: var(--moss);
+    margin-top: 10px;
+  }
+  .status-line .dot{ width:6px; height:6px; border-radius:50%; background: var(--moss); }
+
+  .candidate-name{
+    font-family: 'Fraunces', serif;
+    font-size: 34px;
+    font-weight: 500;
+    line-height: 1.1;
+    margin: 4px 0 2px;
+  }
+  .candidate-role{
+    color: var(--text-lo);
+    font-size: 14px;
+  }
+
+  .stat-row{
+    display:flex; gap: 18px;
+    padding: 16px 0;
+    border-top: 1px solid var(--panel-line);
+    border-bottom: 1px solid var(--panel-line);
+  }
+  .stat{ display:flex; flex-direction:column; gap:2px; }
+  .stat .num{ font-family:'Fraunces', serif; font-size: 22px; color: var(--gold); }
+  .stat .lbl{ font-size: 10px; text-transform: uppercase; color: var(--text-lo); }
+
+  .skills-block .lbl{
+    font-size: 10px; text-transform: uppercase; color: var(--text-lo); margin-bottom: 10px;
+  }
+  .chips{ display:flex; flex-wrap:wrap; gap: 8px; }
+  .chip{
+    font-size: 12px;
+    padding: 5px 10px;
+    border: 1px solid var(--panel-line);
+    border-radius: var(--radius);
+    color: var(--text-hi);
+    background: var(--ink-2);
+  }
+
+  .dossier-foot{
+    margin-top: auto;
+    font-size: 11px;
+    color: var(--text-lo);
+    line-height: 1.6;
+  }
+
+  /* ---------- Chat panel ---------- */
+  .correspondence{
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  .thread-head{
+    padding: 22px 32px 16px;
+    border-bottom: 1px solid var(--panel-line);
+  }
+  .thread-head h1{
+    font-family:'Fraunces', serif;
+    font-weight: 500;
+    font-size: 20px;
+    margin: 0 0 4px;
+  }
+  .thread-head p{
+    margin:0; color: var(--text-lo); font-size: 13px;
+  }
+
+  .suggestions{
+    display:flex; flex-wrap: wrap; gap: 8px;
+    padding: 14px 32px;
+    border-bottom: 1px solid var(--panel-line);
+  }
+  .suggestion{
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 11.5px;
+    padding: 7px 12px;
+    border: 1px solid var(--panel-line);
+    border-radius: var(--radius);
+    background: transparent;
+    color: var(--text-lo);
+    cursor: pointer;
+    transition: border-color .15s ease, color .15s ease;
+  }
+  .suggestion:hover{ border-color: var(--gold); color: var(--gold); }
+
+  .thread{
+    flex: 1;
+    overflow-y: auto;
+    padding: 28px 32px;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+  }
+
+  .msg{ max-width: 72%; display:flex; flex-direction:column; gap:6px; }
+  .msg.hr{ align-self: flex-end; align-items: flex-end; }
+  .msg.candidate{ align-self: flex-start; align-items: flex-start; }
+
+  .msg .tag{
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 10px; text-transform: uppercase;
+    color: var(--text-lo);
+  }
+
+  .bubble{
+    padding: 13px 16px;
+    border-radius: var(--radius);
+    font-size: 14.5px;
+    line-height: 1.55;
+  }
+  .msg.hr .bubble{
+    background: var(--panel);
+    border-right: 2px solid var(--gold);
+    color: var(--text-hi);
+  }
+  .msg.candidate .bubble{
+    background: var(--paper);
+    color: var(--hr-text);
+    border-left: 2px solid var(--moss);
+  }
+  .msg.candidate .bubble.unknown{
+    border-left: 2px dashed var(--err);
+    font-style: italic;
+  }
+  .msg.candidate .bubble.error{
+    border-left: 2px dashed var(--err);
+    color: var(--err);
+    font-style: italic;
+  }
+
+  .typing{
+    display:flex; gap:4px; align-items:center; padding: 4px 2px;
+  }
+  .typing span{
+    width:5px; height:5px; border-radius:50%; background: var(--gold-dim);
+    animation: blink 1.2s infinite ease-in-out;
+  }
+  .typing span:nth-child(2){ animation-delay: .2s; }
+  .typing span:nth-child(3){ animation-delay: .4s; }
+  @keyframes blink{ 0%,80%,100%{ opacity:.25; } 40%{ opacity:1; } }
+
+  .composer{
+    display:flex; gap: 10px;
+    padding: 18px 32px 26px;
+    border-top: 1px solid var(--panel-line);
+  }
+  .composer input{
+    flex:1;
+    background: var(--ink-2);
+    border: 1px solid var(--panel-line);
+    border-radius: var(--radius);
+    padding: 13px 14px;
+    color: var(--text-hi);
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 14px;
+  }
+  .composer input:focus{
+    outline: none;
+    border-color: var(--gold);
+  }
+  .composer button{
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    padding: 0 22px;
+    border-radius: var(--radius);
+    border: 1px solid var(--gold);
+    background: transparent;
+    color: var(--gold);
+    cursor: pointer;
+    transition: background .15s ease, color .15s ease;
+  }
+  .composer button:hover:not(:disabled){ background: var(--gold); color: var(--ink); }
+  .composer button:disabled{ opacity: .4; cursor: not-allowed; }
+
+  .thread::-webkit-scrollbar{ width: 8px; }
+  .thread::-webkit-scrollbar-thumb{ background: var(--panel-line); border-radius: 4px; }
+</style>
+</head>
+<body>
+
+<div class="shell">
+
+  <div class="topbar">
+    <div class="eyebrow">Candidate Dossier <b>·</b> Interactive Q&amp;A</div>
+    <div class="eyebrow mono" id="clock"></div>
+  </div>
+
+  <div class="layout">
+
+    <!-- Dossier -->
+    <aside class="dossier">
+      <div>
+        <div class="seal"><div class="seal-dot"></div></div>
+        <div class="status-line"><span class="dot"></span> Open to opportunities</div>
+      </div>
+
+      <div>
+        <div class="candidate-name" id="candidateName">Loading…</div>
+        <div class="candidate-role" id="candidateRole">Candidate profile</div>
+      </div>
+
+      <div class="stat-row">
+        <div class="stat">
+          <div class="num" id="statYears">—</div>
+          <div class="lbl">Years exp.</div>
+        </div>
+        <div class="stat">
+          <div class="num" id="statSkills">—</div>
+          <div class="lbl">Core skills</div>
+        </div>
+      </div>
+
+      <div class="skills-block">
+        <div class="lbl">Skills</div>
+        <div class="chips" id="skillChips"></div>
+      </div>
+
+      <div class="dossier-foot">
+        This assistant answers only from the candidate's résumé — nothing
+        invented. Ask anything you'd ask in a screening call.
+      </div>
+    </aside>
+
+    <!-- Chat -->
+    <section class="correspondence">
+      <div class="thread-head">
+        <h1>Ask about this candidate</h1>
+        <p>Answers are generated from their résumé, not guessed.</p>
+      </div>
+
+      <div class="suggestions" id="suggestions">
+        <button class="suggestion" data-q="What is your total professional experience?">Total experience</button>
+        <button class="suggestion" data-q="Walk me through your most recent role.">Most recent role</button>
+        <button class="suggestion" data-q="What are your strongest technical skills?">Top skills</button>
+        <button class="suggestion" data-q="Tell me about a project you're proud of.">Notable project</button>
+      </div>
+
+      <div class="thread" id="thread"></div>
+
+      <form class="composer" id="composer">
+        <input
+          type="text"
+          id="question"
+          placeholder="Type a question, e.g. “Do you have experience with SQL?”"
+          autocomplete="off"
+        />
+        <button type="submit" id="sendBtn">Send</button>
+      </form>
+    </section>
+
+  </div>
+</div>
+
+<script>
+  // Same-origin by default (frontend served by main.py). If you host the
+  // frontend separately from the backend, set this to the backend URL,
+  // e.g. "https://your-backend.onrender.com"
+  const API_BASE = "";
+
+  const thread = document.getElementById("thread");
+  const composer = document.getElementById("composer");
+  const questionInput = document.getElementById("question");
+  const sendBtn = document.getElementById("sendBtn");
+
+  function addMessage(role, text, variant) {
+    const wrap = document.createElement("div");
+    wrap.className = "msg " + role;
+
+    const tag = document.createElement("div");
+    tag.className = "tag";
+    tag.textContent = role === "hr" ? "You — HR" : "Candidate (AI)";
+
+    const bubble = document.createElement("div");
+    bubble.className = "bubble" + (variant ? " " + variant : "");
+    bubble.textContent = text;
+
+    wrap.appendChild(tag);
+    wrap.appendChild(bubble);
+    thread.appendChild(wrap);
+    thread.scrollTop = thread.scrollHeight;
+    return bubble;
+  }
+
+  function addTyping() {
+    const wrap = document.createElement("div");
+    wrap.className = "msg candidate";
+    wrap.id = "typing-indicator";
+    const bubble = document.createElement("div");
+    bubble.className = "bubble";
+    bubble.innerHTML = '<div class="typing"><span></span><span></span><span></span></div>';
+    wrap.appendChild(bubble);
+    thread.appendChild(wrap);
+    thread.scrollTop = thread.scrollHeight;
+  }
+
+  function removeTyping() {
+    const el = document.getElementById("typing-indicator");
+    if (el) el.remove();
+  }
+
+  async function sendQuestion(question) {
+    if (!question.trim()) return;
+    addMessage("hr", question);
+    questionInput.value = "";
+    sendBtn.disabled = true;
+    addTyping();
+
+    try {
+      const res = await fetch(API_BASE + "/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ question }),
+      });
+      removeTyping();
+      if (!res.ok) throw new Error("Request failed (" + res.status + ")");
+      const data = await res.json();
+      const answer = data.answer || "I don't have enough information to answer that.";
+      const isUnknown = answer.toLowerCase().includes("don't have enough information");
+      addMessage("candidate", answer, isUnknown ? "unknown" : "");
+    } catch (err) {
+      removeTyping();
+      addMessage("candidate", "Something went wrong reaching the candidate's profile. Please try again in a moment.", "error");
+      console.error(err);
+    } finally {
+      sendBtn.disabled = false;
+      questionInput.focus();
+    }
+  }
+
+  composer.addEventListener("submit", (e) => {
+    e.preventDefault();
+    sendQuestion(questionInput.value);
+  });
+
+  document.getElementById("suggestions").addEventListener("click", (e) => {
+    const btn = e.target.closest(".suggestion");
+    if (!btn) return;
+    sendQuestion(btn.dataset.q);
+  });
+
+  async function loadProfile() {
+    try {
+      const res = await fetch(API_BASE + "/api/profile");
+      if (!res.ok) throw new Error("profile fetch failed");
+      const p = await res.json();
+
+      document.getElementById("candidateName").textContent = p.name || "Candidate";
+      document.getElementById("candidateRole").textContent =
+        (p.skills && p.skills[0]) ? p.skills.slice(0, 3).join(" · ") : "Candidate profile";
+      document.getElementById("statYears").textContent =
+        p.total_experience_years != null ? p.total_experience_years : "—";
+      document.getElementById("statSkills").textContent = p.skills ? p.skills.length : "—";
+
+      const chipBox = document.getElementById("skillChips");
+      chipBox.innerHTML = "";
+      (p.skills || []).forEach((s) => {
+        const chip = document.createElement("span");
+        chip.className = "chip";
+        chip.textContent = s;
+        chipBox.appendChild(chip);
+      });
+
+      addMessage("candidate", `Hi, I'm an AI assistant answering on behalf of ${p.name || "the candidate"}. Ask me anything about their experience, skills, or projects.`);
+    } catch (err) {
+      document.getElementById("candidateName").textContent = "Profile unavailable";
+      document.getElementById("candidateRole").textContent = "Could not reach the backend";
+      addMessage("candidate", "I couldn't load the candidate's profile. Please make sure the backend server is running.", "error");
+      console.error(err);
+    }
+  }
+
+  function tickClock() {
+    const el = document.getElementById("clock");
+    el.textContent = new Date().toLocaleString([], { dateStyle: "medium", timeStyle: "short" });
+  }
+  tickClock();
+  setInterval(tickClock, 30000);
+
+  loadProfile();
+</script>
+
+</body>
+</html>
