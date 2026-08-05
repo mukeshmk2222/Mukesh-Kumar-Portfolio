@@ -7,6 +7,7 @@ import json
 from dotenv import load_dotenv
 from groq import Groq
 from pydantic import BaseModel, Field
+from docx import Document
 
 
 
@@ -188,7 +189,7 @@ def read_resume(file_path):
 
 @app.get("/")
 def home():
-    resume_text = read_pdf(Path("Mukesh_Kumar_Resume.docx"))
+    resume_text = read_resume(Path("Mukesh_Kumar_Resume.docx"))
     resume=parse_resume(resume_text)
     print(resume.model_dump_json(indent=2))
     return {
