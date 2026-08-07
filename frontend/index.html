@@ -429,29 +429,55 @@
       });
       if (!res.ok || !res.body) throw new Error("Request failed (" + res.status + ")");
 
-      // The backend streams the answer piece by piece (stream=True on the
-      // Groq call). Read it as it arrives and grow the bubble live, instead
-      // of waiting for the whole answer before showing anything.
       removeTyping();
       const bubble = addMessage("candidate", "");
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
-      let fullText = "";
+
+      // Two separate tracks, on purpose:
+      // - "received": raw text as it arrives from the network stream.
+      // - "shown": what's actually painted on screen, revealed a few
+      //   characters per animation frame.
+      // Network chunks can arrive in uneven bursts (a few characters, then
+      // a big burst) — revealing "received" on its own would look jumpy or
+      // even instant. Decoupling reveal speed from network speed is what
+      // makes it always look like it's genuinely typing/running in.
+      let received = "";
+      let shown = "";
+      let networkDone = false;
+      let rafId = null;
+
+      function revealFrame() {
+        if (shown.length < received.length) {
+          const step = Math.max(1, Math.ceil(received.length / 250));
+          shown = received.slice(0, Math.min(shown.length + step, received.length));
+          bubble.textContent = shown;
+          thread.scrollTop = thread.scrollHeight;
+        }
+        if (shown.length < received.length || !networkDone) {
+          rafId = requestAnimationFrame(revealFrame);
+        } else {
+          finalize();
+        }
+      }
+
+      function finalize() {
+        let text = shown;
+        if (!text.trim()) {
+          text = "I don't have enough information to answer that.";
+          bubble.textContent = text;
+        }
+        if (text.toLowerCase().includes("don't have enough information")) {
+          bubble.classList.add("unknown");
+        }
+      }
+
+      rafId = requestAnimationFrame(revealFrame);
 
       while (true) {
         const { value, done } = await reader.read();
-        if (done) break;
-        fullText += decoder.decode(value, { stream: true });
-        bubble.textContent = fullText;
-        thread.scrollTop = thread.scrollHeight;
-      }
-
-      if (!fullText.trim()) {
-        fullText = "I don't have enough information to answer that.";
-        bubble.textContent = fullText;
-      }
-      if (fullText.toLowerCase().includes("don't have enough information")) {
-        bubble.classList.add("unknown");
+        if (done) { networkDone = true; break; }
+        received += decoder.decode(value, { stream: true });
       }
     } catch (err) {
       removeTyping();
