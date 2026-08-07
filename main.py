@@ -7,17 +7,22 @@ from pypdf import PdfReader
 from docx import Document
 import os
 import json
+import asyncio
 from dotenv import load_dotenv
-from groq import Groq
+from groq import Groq, AsyncGroq
 from pydantic import BaseModel
 
 load_dotenv()
 my_api_key = os.getenv("GROQ_API_KEY")
 
 if not my_api_key:
-    raise ValueError("API_KEY_ERROR: set GROQ_API_KEY in a .env file next to main.py")
+    raise ValueError("API_KEY_ERROR")
 
+# Sync client: used for resume parsing (a one-off, not streamed).
 client = Groq(api_key=my_api_key)
+# Async client: used for the chat answer, so it can be streamed to the
+# browser as real, incremental chunks instead of arriving all at once.
+async_client = AsyncGroq(api_key=my_api_key)
 model = "openai/gpt-oss-120b"
 
 # Accepted resume formats, in the order they're searched for.
@@ -210,12 +215,13 @@ def get_resume() -> Resume:
     return _resume_cache
 
 
-def ask_candidate_stream(question: str, resume: Resume):
+async def ask_candidate_stream(question: str, resume: Resume):
     """
     Streams the answer back chunk by chunk instead of waiting for the full
-    response. `stream=True` tells Groq to send the reply as it's generated;
-    we then yield each piece as it arrives so the frontend can render it
-    live, like a typing effect.
+    response. Uses the ASYNC Groq client with `stream=True` so each piece
+    of the reply is yielded — and sent to the browser — the moment it
+    arrives, giving the real "typing" effect rather than one big dump at
+    the end.
     """
     system_prompt = f"""
 You are an AI assistant representing a job candidate.
@@ -232,7 +238,7 @@ Rules:
 4. Be professional.
 5. Answer as if HR is interviewing the candidate.
 """
-    stream = client.chat.completions.create(
+    stream = await async_client.chat.completions.create(
         model=model,
         messages=[
             {"role": "system", "content": system_prompt},
@@ -240,7 +246,7 @@ Rules:
         ],
         stream=True,
     )
-    for chunk in stream:
+    async for chunk in stream:
         delta = chunk.choices[0].delta.content
         if delta:
             yield delta
@@ -259,13 +265,24 @@ def profile():
 
 
 @app.post("/chat")
-def chat(request: ChatRequest):
+async def chat(request: ChatRequest):
     # Resolve/parse the resume BEFORE streaming starts, so a parsing error
     # comes back as a normal error response instead of breaking mid-stream.
-    resume = get_resume()
+    # get_resume() is blocking (sync), so it's run off the event loop —
+    # this only matters on the very first request; every request after
+    # that hits the in-memory cache and returns instantly.
+    resume = await asyncio.to_thread(get_resume)
     return StreamingResponse(
         ask_candidate_stream(request.question, resume),
         media_type="text/plain",
+        headers={
+            # Ask any reverse proxy in front of this (Render, nginx, etc.)
+            # not to buffer the response — without this, some proxies hold
+            # the whole reply and send it in one go, killing the streaming
+            # effect even though the server is sending it incrementally.
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+        },
     )
 
 
