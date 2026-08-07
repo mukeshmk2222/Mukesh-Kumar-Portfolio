@@ -228,8 +228,8 @@
     color: var(--text-hi);
   }
   .msg.candidate .bubble{
-    background: var(--paper);
-    color: var(--hr-text);
+    background: none;
+    color: var(--text-hi);
     border-left: 2px solid var(--moss);
   }
   .msg.candidate .bubble.unknown{
@@ -427,12 +427,32 @@
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ question }),
       });
+      if (!res.ok || !res.body) throw new Error("Request failed (" + res.status + ")");
+
+      // The backend streams the answer piece by piece (stream=True on the
+      // Groq call). Read it as it arrives and grow the bubble live, instead
+      // of waiting for the whole answer before showing anything.
       removeTyping();
-      if (!res.ok) throw new Error("Request failed (" + res.status + ")");
-      const data = await res.json();
-      const answer = data.answer || "I don't have enough information to answer that.";
-      const isUnknown = answer.toLowerCase().includes("don't have enough information");
-      addMessage("candidate", answer, isUnknown ? "unknown" : "");
+      const bubble = addMessage("candidate", "");
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let fullText = "";
+
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        fullText += decoder.decode(value, { stream: true });
+        bubble.textContent = fullText;
+        thread.scrollTop = thread.scrollHeight;
+      }
+
+      if (!fullText.trim()) {
+        fullText = "I don't have enough information to answer that.";
+        bubble.textContent = fullText;
+      }
+      if (fullText.toLowerCase().includes("don't have enough information")) {
+        bubble.classList.add("unknown");
+      }
     } catch (err) {
       removeTyping();
       addMessage("candidate", "Something went wrong reaching the candidate's profile. Please try again in a moment.", "error");
