@@ -1,6 +1,7 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import StreamingResponse
 from pathlib import Path
 from pypdf import PdfReader
 from docx import Document
@@ -14,7 +15,7 @@ load_dotenv()
 my_api_key = os.getenv("GROQ_API_KEY")
 
 if not my_api_key:
-    raise ValueError("API_KEY_ERROR")
+    raise ValueError("API_KEY_ERROR: set GROQ_API_KEY in a .env file next to main.py")
 
 client = Groq(api_key=my_api_key)
 model = "openai/gpt-oss-120b"
@@ -209,7 +210,13 @@ def get_resume() -> Resume:
     return _resume_cache
 
 
-def ask_candidate(question: str, resume: Resume) -> str:
+def ask_candidate_stream(question: str, resume: Resume):
+    """
+    Streams the answer back chunk by chunk instead of waiting for the full
+    response. `stream=True` tells Groq to send the reply as it's generated;
+    we then yield each piece as it arrives so the frontend can render it
+    live, like a typing effect.
+    """
     system_prompt = f"""
 You are an AI assistant representing a job candidate.
 
@@ -225,14 +232,18 @@ Rules:
 4. Be professional.
 5. Answer as if HR is interviewing the candidate.
 """
-    response = client.chat.completions.create(
+    stream = client.chat.completions.create(
         model=model,
         messages=[
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": question},
         ],
+        stream=True,
     )
-    return response.choices[0].message.content
+    for chunk in stream:
+        delta = chunk.choices[0].delta.content
+        if delta:
+            yield delta
 
 
 @app.get("/api/profile")
@@ -249,9 +260,13 @@ def profile():
 
 @app.post("/chat")
 def chat(request: ChatRequest):
+    # Resolve/parse the resume BEFORE streaming starts, so a parsing error
+    # comes back as a normal error response instead of breaking mid-stream.
     resume = get_resume()
-    answer = ask_candidate(request.question, resume)
-    return {"answer": answer}
+    return StreamingResponse(
+        ask_candidate_stream(request.question, resume),
+        media_type="text/plain",
+    )
 
 
 # Serve the frontend (frontend/index.html) at "/".
