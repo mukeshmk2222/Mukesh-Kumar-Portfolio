@@ -208,7 +208,10 @@ def find_resume_file() -> Path:
     """
     Resolve which resume file to use:
     1. If RESUME_FILE is set, use it exactly (error if missing).
-    2. Otherwise, auto-detect the first .pdf or .docx file next to main.py.
+    2. Otherwise, auto-detect next to main.py — preferring a filename that
+       contains "resume" or "cv", and always skipping anything that looks
+       like the behavioral document (contains "behav"), so the two auto
+       detectors can never pick up each other's file.
     """
     if RESUME_FILE:
         path = Path(RESUME_FILE)
@@ -220,16 +223,28 @@ def find_resume_file() -> Path:
         return path
 
     here = Path(".")
+    candidates = []
     for ext in SUPPORTED_RESUME_EXTENSIONS:
-        matches = sorted(here.glob(f"*{ext}"))
-        if matches:
-            return matches[0]
+        for match in sorted(here.glob(f"*{ext}")):
+            if "behav" in match.stem.lower():
+                continue
+            candidates.append(match)
 
-    raise HTTPException(
-        status_code=500,
-        detail="No resume file found. Add a .pdf or .docx resume next to main.py "
-        "(or set RESUME_FILE to an exact filename).",
-    )
+    if not candidates:
+        raise HTTPException(
+            status_code=500,
+            detail="No resume file found. Add a .pdf or .docx resume next to main.py "
+            "(or set RESUME_FILE to an exact filename).",
+        )
+
+    # Prefer a filename that explicitly says "resume" or "cv" over an
+    # arbitrary other document that happens to sort first alphabetically.
+    for match in candidates:
+        stem = match.stem.lower()
+        if "resume" in stem or stem.endswith("cv") or "_cv_" in stem or "-cv-" in stem:
+            return match
+
+    return candidates[0]
 
 
 def find_behavioral_file() -> Path | None:
