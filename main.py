@@ -5,6 +5,7 @@ from fastapi.responses import StreamingResponse
 from pathlib import Path
 from pypdf import PdfReader
 from docx import Document
+import docx2txt
 import os
 import json
 import asyncio
@@ -113,17 +114,39 @@ def read_pdf(file_path: Path) -> str:
 
 
 def read_docx(file_path: Path) -> str:
-    document = Document(file_path)
+    """
+    Extract text from a .docx file.
+
+    python-docx's `document.paragraphs` only walks body-level paragraphs —
+    it does NOT see text placed inside text boxes, which many designed
+    resume templates use for the candidate's name/header. docx2txt parses
+    the underlying XML more broadly and does pick up text-box content, so
+    we run it first and fall back to (or merge in) python-docx output for
+    anything it might miss (e.g. some table layouts).
+    """
     text = ""
+    try:
+        text = docx2txt.process(str(file_path)) or ""
+    except Exception:
+        text = ""
+
+    document = Document(file_path)
+    fallback_lines = []
     for paragraph in document.paragraphs:
         if paragraph.text.strip():
-            text += paragraph.text + "\n"
+            fallback_lines.append(paragraph.text)
     for table in document.tables:
         for row in table.rows:
             for cell in row.cells:
                 if cell.text.strip():
-                    text += cell.text + "\n"
-    return text
+                    fallback_lines.append(cell.text)
+    fallback_text = "\n".join(fallback_lines)
+
+    # Merge both extractions so nothing is lost: docx2txt tends to catch
+    # text boxes/headers that python-docx misses, while python-docx is
+    # more reliable for some table structures.
+    combined = (text + "\n" + fallback_text).strip()
+    return combined if combined else fallback_text
 
 
 def read_txt(file_path: Path) -> str:
@@ -246,6 +269,10 @@ def parse_resume(resume_text: str) -> Resume:
     3. If a list has no information, return an empty list.
     4. Include internships inside experiences.
     5. Extract skills mentioned across the entire resume.
+    6. The candidate's name is usually the most prominent line near the
+       very top of the document (often larger/bold text, a header, or a
+       text box) — it may appear before any section heading like
+       "Experience" or "Contact". Look there first for the "name" field.
     """
     user_prompt = f"""
     Parse the following resume:
