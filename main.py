@@ -33,6 +33,18 @@ SUPPORTED_RESUME_EXTENSIONS = (".pdf", ".docx")
 # will use the first .pdf or .docx file it finds next to main.py.
 RESUME_FILE = ""
 
+# Accepted behavioral-document formats, in the order they're searched for.
+# This document holds STAR-format stories / behavioral Q&A prep material
+# (e.g. "Tell me about a time you faced conflict at work") so the chatbot
+# can answer HR behavioral questions, not just resume/skills questions.
+SUPPORTED_BEHAVIORAL_EXTENSIONS = (".pdf", ".docx", ".txt")
+
+# Optional: set this to an exact filename (e.g. "Behavioral_Answers.docx")
+# to force a specific file. Leave it empty to auto-detect — the app will
+# use the first file next to main.py whose name contains "behav"
+# (case-insensitive), matching .pdf, .docx, or .txt.
+BEHAVIORAL_FILE = ""
+
 app = FastAPI(title="Candidate Chatbot API")
 
 # Allow the frontend (any origin) to call this API. Needed any time the
@@ -82,6 +94,13 @@ class ChatRequest(BaseModel):
 # ---------------------------------------------------------------------------
 _resume_cache: Resume | None = None
 
+# The behavioral document is plain prep text (STAR stories, behavioral Q&A,
+# etc.) — unlike the resume, it's NOT parsed into structured JSON, since
+# behavioral answers are narrative and free-form. It's just read once and
+# cached as raw text, then handed to the model as extra context.
+_behavioral_cache: str | None = None
+_behavioral_loaded: bool = False
+
 
 def read_pdf(file_path: Path) -> str:
     reader = PdfReader(file_path)
@@ -107,6 +126,10 @@ def read_docx(file_path: Path) -> str:
     return text
 
 
+def read_txt(file_path: Path) -> str:
+    return file_path.read_text(encoding="utf-8", errors="ignore")
+
+
 def read_resume_text(file_path: Path) -> str:
     """Extract text from a resume file, dispatching by extension."""
     suffix = file_path.suffix.lower()
@@ -117,6 +140,21 @@ def read_resume_text(file_path: Path) -> str:
     raise HTTPException(
         status_code=500,
         detail=f"Unsupported resume file type '{suffix}'. Use .pdf or .docx.",
+    )
+
+
+def read_document_text(file_path: Path) -> str:
+    """Extract text from a document, dispatching by extension (pdf/docx/txt)."""
+    suffix = file_path.suffix.lower()
+    if suffix == ".pdf":
+        return read_pdf(file_path)
+    if suffix == ".docx":
+        return read_docx(file_path)
+    if suffix == ".txt":
+        return read_txt(file_path)
+    raise HTTPException(
+        status_code=500,
+        detail=f"Unsupported file type '{suffix}'. Use .pdf, .docx, or .txt.",
     )
 
 
@@ -146,6 +184,34 @@ def find_resume_file() -> Path:
         detail="No resume file found. Add a .pdf or .docx resume next to main.py "
         "(or set RESUME_FILE to an exact filename).",
     )
+
+
+def find_behavioral_file() -> Path | None:
+    """
+    Resolve which behavioral document to use:
+    1. If BEHAVIORAL_FILE is set, use it exactly (error if missing).
+    2. Otherwise, auto-detect a file next to main.py whose name contains
+       "behav" (case-insensitive) with a supported extension.
+    3. If nothing is found, return None — the behavioral doc is optional,
+       so the app still runs fine without one (it just won't have
+       behavioral-specific prep material to draw on).
+    """
+    if BEHAVIORAL_FILE:
+        path = Path(BEHAVIORAL_FILE)
+        if not path.exists():
+            raise HTTPException(
+                status_code=500,
+                detail=f"Behavioral file '{BEHAVIORAL_FILE}' was not found next to main.py.",
+            )
+        return path
+
+    here = Path(".")
+    for ext in SUPPORTED_BEHAVIORAL_EXTENSIONS:
+        for match in sorted(here.glob(f"*{ext}")):
+            if "behav" in match.stem.lower():
+                return match
+
+    return None
 
 
 def parse_resume(resume_text: str) -> Resume:
@@ -215,7 +281,24 @@ def get_resume() -> Resume:
     return _resume_cache
 
 
-async def ask_candidate_stream(question: str, resume: Resume):
+def get_behavioral_content() -> str | None:
+    """
+    Return the cached behavioral-document text, reading it on first use
+    only. Returns None if no behavioral document was found — this is
+    optional, so its absence is not an error.
+    """
+    global _behavioral_cache, _behavioral_loaded
+    if not _behavioral_loaded:
+        _behavioral_loaded = True
+        path = find_behavioral_file()
+        if path is not None:
+            text = read_document_text(path)
+            if text.strip():
+                _behavioral_cache = text
+    return _behavioral_cache
+
+
+async def ask_candidate_stream(question: str, resume: Resume, behavioral_content: str | None):
     """
     Streams the answer back chunk by chunk instead of waiting for the full
     response. Uses the ASYNC Groq client with `stream=True` so each piece
@@ -223,20 +306,44 @@ async def ask_candidate_stream(question: str, resume: Resume):
     arrives, giving the real "typing" effect rather than one big dump at
     the end.
     """
+    behavioral_section = (
+        f"""
+Below is the candidate's behavioral interview prep material (STAR-format
+stories, past behavioral Q&A, etc.). Use this to answer behavioral/HR
+questions such as "Tell me about a time when...", "How do you handle
+conflict?", "Describe a challenge you faced", etc.:
+
+{behavioral_content}
+"""
+        if behavioral_content
+        else """
+No behavioral prep document is available. If asked a behavioral question
+("Tell me about a time when...", "How do you handle conflict?", etc.),
+answer using only what can reasonably be inferred from the resume/experience
+below. If there isn't enough information, say
+"I don't have enough information to answer that."
+"""
+    )
+
     system_prompt = f"""
 You are an AI assistant representing a job candidate.
 
-Below is everything you know about the candidate:
+Below is everything you know about the candidate's resume:
 
 {resume.model_dump_json(indent=2)}
 
+{behavioral_section}
+
 Rules:
-1. Answer only using this information.
+1. Answer only using the information provided above (resume and, if
+   present, behavioral prep material).
 2. Never hallucinate.
 3. If information is unavailable, say
    "I don't have enough information to answer that."
 4. Be professional.
 5. Answer as if HR is interviewing the candidate.
+6. For behavioral questions, prefer the STAR format (Situation, Task,
+   Action, Result) when the behavioral prep material supports it.
 """
     stream = await async_client.chat.completions.create(
         model=model,
@@ -261,6 +368,7 @@ def profile():
         "total_experience_years": resume.total_experience_years,
         "skills": resume.skills[:10],
         "education": resume.education,
+        "has_behavioral_doc": get_behavioral_content() is not None,
     }
 
 
@@ -272,8 +380,9 @@ async def chat(request: ChatRequest):
     # this only matters on the very first request; every request after
     # that hits the in-memory cache and returns instantly.
     resume = await asyncio.to_thread(get_resume)
+    behavioral_content = await asyncio.to_thread(get_behavioral_content)
     return StreamingResponse(
-        ask_candidate_stream(request.question, resume),
+        ask_candidate_stream(request.question, resume, behavioral_content),
         media_type="text/plain",
         headers={
             # Ask any reverse proxy in front of this (Render, nginx, etc.)
