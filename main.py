@@ -399,6 +399,25 @@ def profile():
     }
 
 
+# ---------------------------------------------------------------------------
+# TEMPORARY DEBUG ENDPOINT — remove once the name/profile issue is confirmed
+# fixed. Lets you see exactly what text was extracted from the resume file
+# and what the LLM parsed from it, so you can tell whether the problem is
+# extraction (text missing) or parsing (text present but not captured).
+# ---------------------------------------------------------------------------
+@app.get("/api/debug/resume")
+def debug_resume():
+    path = find_resume_file()
+    raw_text = read_resume_text(path)
+    resume = get_resume()
+    return {
+        "resume_file": path.name,
+        "extracted_text_length": len(raw_text),
+        "extracted_text_preview": raw_text[:1500],
+        "parsed_resume": resume.model_dump(),
+    }
+
+
 @app.post("/chat")
 async def chat(request: ChatRequest):
     # Resolve/parse the resume BEFORE streaming starts, so a parsing error
