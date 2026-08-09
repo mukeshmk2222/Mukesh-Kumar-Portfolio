@@ -181,6 +181,29 @@ def read_document_text(file_path: Path) -> str:
     )
 
 
+def guess_name_from_text(text: str) -> str | None:
+    """
+    Deterministic fallback for the candidate's name: on the vast majority
+    of resumes, the very first non-empty line IS the name (before any
+    contact info or section heading). Used only when the LLM parse comes
+    back with name=null, so a flaky/odd model response doesn't lose
+    something that's plainly sitting at the top of the document.
+    """
+    for line in text.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        # Reject lines that are clearly not a bare name: emails, phone
+        # numbers/dates, or long section text.
+        if "@" in line or any(ch.isdigit() for ch in line):
+            return None
+        words = line.split()
+        if 1 <= len(words) <= 5 and len(line) <= 60:
+            return line
+        return None
+    return None
+
+
 def find_resume_file() -> Path:
     """
     Resolve which resume file to use:
@@ -305,6 +328,13 @@ def get_resume() -> Resume:
                 "It may be a scanned/image-based document.",
             )
         _resume_cache = parse_resume(text)
+        # Safety net: if the LLM didn't extract a name even though it's
+        # plainly the first line of the document, fill it in directly
+        # instead of showing a blank/placeholder name in the UI.
+        if not _resume_cache.name or not _resume_cache.name.strip():
+            guessed = guess_name_from_text(text)
+            if guessed:
+                _resume_cache.name = guessed
     return _resume_cache
 
 
