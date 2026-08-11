@@ -372,63 +372,119 @@ def get_behavioral_content() -> str | None:
 
 async def ask_candidate_stream(question: str, resume: Resume, behavioral_content: str | None):
     """
-    Streams the answer back chunk by chunk instead of waiting for the full
-    response. Uses the ASYNC Groq client with `stream=True` so each piece
-    of the reply is yielded — and sent to the browser — the moment it
-    arrives, giving the real "typing" effect rather than one big dump at
-    the end.
-    """
-    behavioral_section = (
-        f"""
-Below is the candidate's behavioral interview prep material (STAR-format
-stories, past behavioral Q&A, etc.). Use this to answer behavioral/HR
-questions such as "Tell me about a time when...", "How do you handle
-conflict?", "Describe a challenge you faced", etc.:
+    Stream the candidate answer while keeping the Groq request safely below
+    the current token-per-minute limit.
 
-{behavioral_content}
-"""
-        if behavioral_content
-        else """
-No behavioral prep document is available. If asked a behavioral question
-("Tell me about a time when...", "How do you handle conflict?", etc.),
-answer using only what can reasonably be inferred from the resume/experience
-below. If there isn't enough information, say
-"I don't have enough information to answer that."
-"""
+    The behavioral document can be much larger than the structured resume.
+    It is therefore included only for questions that are actually behavioral,
+    and it is capped to a reasonable size. This prevents the full behavioral
+    document from being sent with every question.
+    """
+
+    # Behavioral material is only useful for questions that ask for a
+    # situation/story/HR example. Do not send the whole behavioral document
+    # for normal skills, experience, project, or "tell me about yourself"
+    # questions.
+    behavioral_keywords = (
+        "tell me about a time",
+        "describe a time",
+        "give me an example",
+        "example of a",
+        "conflict",
+        "challenge",
+        "difficult situation",
+        "failure",
+        "mistake",
+        "disagreement",
+        "leadership",
+        "teamwork",
+        "team conflict",
+        "pressure",
+        "stress",
+        "deadline",
+        "stakeholder",
+        "feedback",
+        "weakness",
+        "strength",
+        "behavioral",
+        "situation",
+        "problem you faced",
+        "how did you handle",
+        "how do you handle",
     )
+
+    question_lower = question.lower()
+    is_behavioral = any(keyword in question_lower for keyword in behavioral_keywords)
+
+    # Keep a substantial safety margin below Groq's current 8,000 TPM limit.
+    # 12,000 characters is roughly 3,000 tokens for typical English text.
+    MAX_BEHAVIORAL_CHARS = 12000
+
+    if behavioral_content and is_behavioral:
+        behavioral_context = behavioral_content[:MAX_BEHAVIORAL_CHARS]
+
+        behavioral_section = f"""
+Below is the candidate's behavioral interview prep material (STAR-format
+stories, past behavioral Q&A, etc.). Use it to answer the behavioral question.
+
+Behavioral prep:
+{behavioral_context}
+"""
+    else:
+        behavioral_section = """
+No behavioral prep material is included for this question. Use the structured
+resume information below for normal questions about experience, skills,
+projects, education, and career background.
+"""
 
     system_prompt = f"""
 You are an AI assistant representing a job candidate.
 
-Below is everything you know about the candidate's resume:
+Below is the structured information available about the candidate's resume:
 
 {resume.model_dump_json(indent=2)}
 
 {behavioral_section}
 
 Rules:
-1. Answer only using the information provided above (resume and, if
-   present, behavioral prep material).
-2. Never hallucinate.
-3. If information is unavailable, say
+1. Answer only using the information provided above.
+2. Never hallucinate or invent experience, skills, employers, dates, or projects.
+3. If information is unavailable, say:
    "I don't have enough information to answer that."
-4. Be professional.
+4. Be professional and concise.
 5. Answer as if HR is interviewing the candidate.
-6. For behavioral questions, prefer the STAR format (Situation, Task,
-   Action, Result) when the behavioral prep material supports it.
+6. For behavioral questions, prefer the STAR format (Situation, Task, Action,
+   Result) when the behavioral prep material supports it.
 """
-    stream = await async_client.chat.completions.create(
-        model=model,
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": question},
-        ],
-        stream=True,
+
+    print(
+        f"Chat request | behavioral={is_behavioral} | "
+        f"behavioral_chars={len(behavioral_context) if behavioral_content and is_behavioral else 0}"
     )
-    async for chunk in stream:
-        delta = chunk.choices[0].delta.content
-        if delta:
-            yield delta
+
+    try:
+        stream = await async_client.chat.completions.create(
+            model=model,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": question},
+            ],
+            stream=True,
+        )
+
+        async for chunk in stream:
+            if not chunk.choices:
+                continue
+            delta = chunk.choices[0].delta.content
+            if delta:
+                yield delta
+
+    except Exception as e:
+        # Log the real error so it is visible in the backend/Render logs.
+        # Do not hide Groq errors behind the misleading "not enough information"
+        # message.
+        print(f"LLM ERROR: {type(e).__name__}: {e}")
+        yield "I’m temporarily unable to answer because the AI service returned an error. Please try again."
 
 
 @app.get("/api/profile")
