@@ -1,0 +1,159 @@
+{
+  "name": "MUKESH KUMAR",
+  "total_experience_years": 13.0,
+  "skills": [
+    "Python",
+    "Pandas",
+    "NumPy",
+    "Scikit-learn",
+    "NLTK",
+    "SpaCy",
+    "SQL",
+    "Spark Scala",
+    "REST API",
+    "FastAPI",
+    "XGBoost",
+    "Random Forest",
+    "Logistic Regression",
+    "K-Means",
+    "DBSCAN",
+    "ARIMA",
+    "Ensemble Methods",
+    "Feature Engineering",
+    "PyTorch",
+    "TensorFlow",
+    "GPT-4",
+    "Claude",
+    "LLaMA-3",
+    "RAG Architectures",
+    "AI Agents",
+    "LangChain",
+    "HuggingFace",
+    "Prompt Engineering",
+    "Databricks",
+    "Azure ML",
+    "Azure OpenAI",
+    "Form Recognizer",
+    "GCP",
+    "Hadoop",
+    "HDFS",
+    "MLflow",
+    "Azure Data Factory",
+    "Streamlit",
+    "SQL Server",
+    "PostgreSQL",
+    "ChromaDB",
+    "FAISS",
+    "Power BI",
+    "Tableau",
+    "Excel",
+    "SHAP",
+    "TF-IDF",
+    "SVD",
+    "LSA",
+    "UMAP",
+    "REST API",
+    "Orange",
+    "ARIMA",
+    "ADF",
+    "ACF",
+    "PACF",
+    "Ljung-Box"
+  ],
+  "experience": [
+    {
+      "company": "Tata Consultancy Services (TCS)",
+      "role": "Associate Consultant — Data Science & AI",
+      "duration": "Oct 2023 – Present",
+      "description": "Sole data science owner for a UK water utility client engagement. Delivered Customer Persona Segmentation (3.5M+ accounts) using Databricks, PySpark, K-Means, MLflow and Power BI, reducing campaign cost by 20–30%. Built a complaint‑prediction model with XGBoost, achieving >80% accuracy and integrated into Power BI with SHAP explainability. Developed an NLP text‑clustering pipeline for field service notes (100K records) using PySpark, TF‑IDF, SVD, UMAP, K‑Means and a Databricks‑hosted LLaMA‑3 model for automated topic labeling, exposed via REST API.",
+      "skill_used": [
+        "Databricks",
+        "PySpark",
+        "K-Means",
+        "MLflow",
+        "Power BI",
+        "SQL",
+        "Python",
+        "XGBoost",
+        "SHAP",
+        "TF-IDF",
+        "SVD",
+        "LSA",
+        "UMAP",
+        "LLaMA-3",
+        "REST API",
+        "FastAPI"
+      ]
+    },
+    {
+      "company": "Data Semantics Pvt. Ltd.",
+      "role": "Data Scientist",
+      "duration": "Feb 2018 – Aug 2023",
+      "description": "Led campaign analysis for hidden affluent customers using an ensemble of Logistic Regression, Random Forest and XGBoost, achieving 88–92% accuracy and 15–20% lift in conversion. Implemented DBSCAN and K‑Means for outlier detection. Developed SMS categorization and recommendation system using Spark Scala and association‑rule mining with Orange, creating rule dictionaries and recommendation logic.",
+      "skill_used": [
+        "Python",
+        "XGBoost",
+        "Random Forest",
+        "Logistic Regression",
+        "SQL Server",
+        "DBSCAN",
+        "K-Means",
+        "Spark Scala",
+        "Orange"
+      ]
+    },
+    {
+      "company": "TEKsystems Global Services",
+      "role": "Statistics Engineer",
+      "duration": "Jun 2017 – Dec 2017",
+      "description": "Created statistical models and performed exploratory data analysis for client datasets. Built an ARIMA time‑series model to forecast CPU utilization with 82% accuracy (MAPE=18%) and deployed it for proactive load balancing across servers.",
+      "skill_used": [
+        "Python",
+        "ARIMA",
+        "Time-Series",
+        "ADF",
+        "ACF",
+        "PACF",
+        "Ljung-Box"
+      ]
+    },
+    {
+      "company": "Genpact India Pvt. Ltd.",
+      "role": "Senior Associate — Business Analysis",
+      "duration": "Jan 2014 – May 2017",
+      "description": "Managed end‑to‑end reporting and analytics for BFSI clients, built Tableau dashboards for senior leadership, and supported predictive modelling and retirement‑benefits analysis for US financial clients.",
+      "skill_used": [
+        "Tableau",
+        "Reporting",
+        "Analytics"
+      ]
+    },
+    {
+      "company": "Fidelity Investments",
+      "role": "Senior Associate",
+      "duration": "May 2011 – Jul 2013",
+      "description": "Processed and validated US retirement plan benefit data and built automated Excel‑based reporting, reducing monthly reporting time by ~40%.",
+      "skill_used": [
+        "Excel",
+        "Reporting"
+      ]
+    }
+  ],
+  "education": [
+    "PGDAST (Applied Statistics) — IGNOU",
+    "B.B.A. (Finance) — Dayananda Sagar Business School, Bengaluru"
+  ],
+  "projects": [
+    "Customer Persona Segmentation",
+    "Complaint Prediction Model",
+    "NLP Text‑Clustering Pipeline — Field Service Notes",
+    "Campaign Analysis — Hidden Affluent Customers",
+    "SMS Categorization and Recommendation",
+    "CPU Anomaly Detection & Forecasting"
+  ],
+  "certifications": [
+    "Generative AI Application Design and Development — Udemy",
+    "The AI Ethics Course — Udemy",
+    "Responsible AI: Principles, Practices, and Application — Udemy"
+  ]
+}

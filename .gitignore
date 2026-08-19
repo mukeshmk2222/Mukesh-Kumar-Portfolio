@@ -30,3 +30,7 @@ Thumbs.db
 
 # Private documents
 private/
+
+# Local document conversion utilities
+generate_resume_json.py
+generate_behavioral_text.py

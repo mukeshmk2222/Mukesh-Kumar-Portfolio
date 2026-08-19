@@ -341,44 +341,94 @@ def parse_resume(resume_text: str) -> Resume:
     data = json.loads(response.choices[0].message.content)
     return Resume(**data)
 
+def load_resume_from_json() -> Resume:
+    """Load the production-safe resume data used on Render."""
+    path = Path(__file__).resolve().parent / "resume_data.json"
+
+    if not path.exists():
+        raise HTTPException(
+            status_code=500,
+            detail="resume_data.json was not found on the server."
+        )
+
+    try:
+        with path.open("r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        return Resume(**data)
+
+    except Exception as exc:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Could not load resume_data.json: {exc}"
+        )
+
+
 
 def get_resume() -> Resume:
-    """Return the cached, parsed resume, parsing it on first use only."""
+    """Return the cached resume."""
+
     global _resume_cache
+
     if _resume_cache is None:
+
+        # Render Free uses the public-safe JSON representation.
+        if os.getenv("RENDER"):
+            _resume_cache = load_resume_from_json()
+            return _resume_cache
+
+        # Local development continues to use the original DOCX.
         path = find_resume_file()
         text = read_resume_text(path)
+
         if not text.strip():
             raise HTTPException(
                 status_code=500,
                 detail=f"Could not extract any text from '{path.name}'. "
-                "It may be a scanned/image-based document.",
+                       "It may be a scanned/image-based document.",
             )
+
         _resume_cache = parse_resume(text)
-        # Safety net: if the LLM didn't extract a name even though it's
-        # plainly the first line of the document, fill it in directly
-        # instead of showing a blank/placeholder name in the UI.
+
+        # Safety net for the name.
         if not _resume_cache.name or not _resume_cache.name.strip():
             guessed = guess_name_from_text(text)
             if guessed:
                 _resume_cache.name = guessed
+
     return _resume_cache
 
 
 def get_behavioral_content() -> str | None:
     """
-    Return the cached behavioral-document text, reading it on first use
-    only. Returns None if no behavioral document was found — this is
-    optional, so its absence is not an error.
+    Return cached behavioral content.
+
+    On Render, use the text-based behavioral_data.txt file.
+    Locally, continue using the original behavioral DOCX.
     """
     global _behavioral_cache, _behavioral_loaded
+
     if not _behavioral_loaded:
         _behavioral_loaded = True
-        path = find_behavioral_file()
-        if path is not None:
-            text = read_document_text(path)
-            if text.strip():
-                _behavioral_cache = text
+
+        if os.getenv("RENDER"):
+            path = Path(__file__).resolve().parent / "behavioral_data.txt"
+
+            if path.exists():
+                text = path.read_text(encoding="utf-8")
+
+                if text.strip():
+                    _behavioral_cache = text
+
+        else:
+            path = find_behavioral_file()
+
+            if path is not None:
+                text = read_document_text(path)
+
+                if text.strip():
+                    _behavioral_cache = text
+
     return _behavioral_cache
 
 
@@ -512,23 +562,7 @@ def profile():
     }
 
 
-# ---------------------------------------------------------------------------
-# TEMPORARY DEBUG ENDPOINT — remove once the name/profile issue is confirmed
-# fixed. Lets you see exactly what text was extracted from the resume file
-# and what the LLM parsed from it, so you can tell whether the problem is
-# extraction (text missing) or parsing (text present but not captured).
-# ---------------------------------------------------------------------------
-@app.get("/api/debug/resume")
-def debug_resume():
-    path = find_resume_file()
-    raw_text = read_resume_text(path)
-    resume = get_resume()
-    return {
-        "resume_file": path.name,
-        "extracted_text_length": len(raw_text),
-        "extracted_text_preview": raw_text[:1500],
-        "parsed_resume": resume.model_dump(),
-    }
+
 
 
 @app.post("/chat")
