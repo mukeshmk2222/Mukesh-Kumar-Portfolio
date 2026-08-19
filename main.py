@@ -29,13 +29,7 @@ model = "openai/gpt-oss-120b"
 # Accepted resume formats, in the order they're searched for.
 SUPPORTED_RESUME_EXTENSIONS = (".pdf", ".docx")
 
-# Optional: set this to an exact filename (e.g. "My_Resume.docx") if you
-# want to force a specific file. Leave it empty to auto-detect — the app
-# will use the first .pdf or .docx file it finds next to main.py.
-RESUME_FILE = os.getenv(
-    "RESUME_FILE",
-    "./private/Mukesh_Kumar_Resume.docx"
-)
+
 
 # Accepted behavioral-document formats, in the order they're searched for.
 # This document holds STAR-format stories / behavioral Q&A prep material
@@ -47,10 +41,22 @@ SUPPORTED_BEHAVIORAL_EXTENSIONS = (".pdf", ".docx", ".txt")
 # to force a specific file. Leave it empty to auto-detect — the app will
 # use the first file next to main.py whose name contains "behav"
 # (case-insensitive), matching .pdf, .docx, or .txt.
+RESUME_FILE = os.getenv(
+    "RESUME_FILE",
+    "./private/Mukesh_Kumar_Resume.docx"
+)
+
+if os.getenv("RENDER"):
+    RESUME_FILE = "/etc/secrets/Mukesh_Kumar_Resume.docx"
+
+
 BEHAVIORAL_FILE = os.getenv(
     "BEHAVIORAL_FILE",
     "./private/HR_Behavioural_Interview_Answer_Bank_Chatbot_document.docx"
 )
+
+if os.getenv("RENDER"):
+    BEHAVIORAL_FILE = "/etc/secrets/HR_Behavioural_Interview_Answer_Bank_Chatbot_document.docx"
 
 app = FastAPI(title="Candidate Chatbot API")
 
